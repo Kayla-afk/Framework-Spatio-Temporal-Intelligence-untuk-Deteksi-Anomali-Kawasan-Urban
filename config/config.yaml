@@ -1,0 +1,92 @@
+# Urban Anomaly Framework - Configuration
+# Semua parameter pipeline dikontrol dari file ini
+
+# Studi kasus: bounding box metropolitan Surabaya
+# Koordinat ini digunakan untuk spatial remapping dari dataset publik
+study_area:
+  name: "Metropolitan Surabaya"
+  lat_min: -7.4
+  lat_max: -7.1
+  lon_min: 112.6
+  lon_max: 112.85
+  reference_lat: -7.2575   # pusat kota
+  reference_lon: 112.7521
+
+# Dataset paths (relatif terhadap root project)
+data:
+  mobility_raw_dir: "data/raw/mobility"
+  transaction_raw_dir: "data/raw/transactions"
+  processed_dir: "data/processed"
+  # Nama file output intermediate
+  mobility_processed: "mobility_processed.csv"
+  transaction_processed: "transaction_processed.csv"
+
+# Ingestion: GeoLife
+geolife:
+  # Batas jumlah trajectory yang diproses (None = semua)
+  max_trajectories: 500
+  # Filter: hanya ambil trajectory dengan minimal N titik
+  min_points_per_trajectory: 50
+  # Filter: rentang waktu (format YYYY-MM-DD), None = semua
+  date_start: null
+  date_end: null
+
+# Ingestion: IEEE-CIS / Kaggle transaction proxy
+transaction:
+  # Kolom yang dipetakan dari dataset asli ke format internal
+  # Sesuaikan dengan dataset yang kamu download
+  source_columns:
+    amount: "TransactionAmt"         # nilai transaksi
+    timestamp: "TransactionDT"       # unix timestamp relatif
+    device_type: "DeviceType"        # opsional
+  # Jumlah area urban yang disimulasikan (grid spatial)
+  n_urban_areas: 20
+  # Seed untuk reproducibility simulasi spasial
+  random_seed: 42
+
+# Stage 1: HDBSCAN Clustering
+hdbscan:
+  min_cluster_size: 15
+  min_samples: 5
+  cluster_selection_epsilon: 0.003   # ~300m dalam derajat
+  metric: "euclidean"
+  # Threshold kepadatan untuk menandai hotspot
+  hotspot_density_percentile: 75
+
+# Stage 2: Isolation Forest (Temporal Anomaly Detection)
+isolation_forest:
+  contamination: 0.05    # estimasi proporsi anomali (5%)
+  n_estimators: 200
+  max_samples: "auto"
+  random_state: 42
+  # Window temporal untuk aggregasi (dalam menit)
+  temporal_window_minutes: 30
+
+# Stage 3: Transaction Contextualization
+transaction_analysis:
+  # Ambang batas z-score untuk menandai fluktuasi signifikan
+  zscore_threshold: 2.5
+  # Window rolling untuk deteksi spike transaksi
+  rolling_window_hours: 3
+
+# Stage 4: Integration scoring
+integration:
+  # Bobot untuk composite anomaly score
+  # Total harus = 1.0
+  spatial_join_threshold: 0.08
+  weight_mobility_anomaly: 0.45
+  weight_spatial_cluster_density: 0.25
+  weight_transaction_irregularity: 0.30
+  # Threshold final untuk klasifikasi kawasan
+  high_risk_threshold: 0.65
+  medium_risk_threshold: 0.35
+
+# Output
+output:
+  maps_dir: "outputs/maps"
+  figures_dir: "outputs/figures"
+  reports_dir: "outputs/reports"
+  # Resolusi figure (dpi)
+  figure_dpi: 150
+  # Colormap untuk risk heatmap
+  risk_colormap: "RdYlGn_r"
